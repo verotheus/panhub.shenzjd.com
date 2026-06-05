@@ -1,8 +1,8 @@
 import type { IHotSearchStore, HotSearchItem, HotSearchStats } from "./hotSearchStore";
 
 const MAX_ENTRIES = 30;
-const DB_DIR = "./data";
-const DB_PATH = "./data/hot-searches.db";
+const DEFAULT_DB_DIR = "./data";
+const DEFAULT_DB_PATH = "./data/hot-searches.db";
 const LAMBDA = 0.05;
 
 function isForbidden(term: string): boolean {
@@ -29,8 +29,12 @@ export class SqliteHotSearchStore implements IHotSearchStore {
   private isInitialized = false;
   private initFailed = false;
   private initPromise: Promise<void> | null = null;
+  private dbPath: string;
+  private dbDir: string;
 
-  constructor() {
+  constructor(dbPath?: string) {
+    this.dbPath = dbPath || DEFAULT_DB_PATH;
+    this.dbDir = this.dbPath.substring(0, this.dbPath.lastIndexOf("/")) || DEFAULT_DB_DIR;
     this.initPromise = this.init()
       .then(() => {
         this.isInitialized = true;
@@ -47,11 +51,11 @@ export class SqliteHotSearchStore implements IHotSearchStore {
   private async init(): Promise<void> {
     const Database = (await import("better-sqlite3")).default;
     const { mkdirSync, existsSync } = await import("fs");
-    if (!existsSync(DB_DIR)) {
-      mkdirSync(DB_DIR, { recursive: true });
+    if (!existsSync(this.dbDir)) {
+      mkdirSync(this.dbDir, { recursive: true });
     }
 
-    this.db = new Database(DB_PATH);
+    this.db = new Database(this.dbPath);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("busy_timeout = 5000");
 
@@ -145,8 +149,8 @@ export class SqliteHotSearchStore implements IHotSearchStore {
   getDbSize(): number {
     try {
       const { existsSync, statSync } = require("fs");
-      if (existsSync(DB_PATH)) {
-        return Math.round((statSync(DB_PATH).size / (1024 * 1024)) * 100) / 100;
+      if (existsSync(this.dbPath)) {
+        return Math.round((statSync(this.dbPath).size / (1024 * 1024)) * 100) / 100;
       }
     } catch {}
     return 0;
