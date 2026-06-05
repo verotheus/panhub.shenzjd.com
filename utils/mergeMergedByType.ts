@@ -1,4 +1,4 @@
-import type { MergedLinks } from "~/server/core/types/models";
+import type { MergedLinks } from "~/types/search";
 
 /** 按类型合并搜索结果，按 url 去重 */
 export function mergeMergedByType(

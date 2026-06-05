@@ -1,4 +1,4 @@
-import type { MergedLinks, GenericResponse, SearchResponse } from "~/server/core/types/models";
+import type { MergedLinks, GenericResponse, SearchResponse } from "~/types/search";
 import { ALL_PLUGIN_NAMES } from "~/config/plugins";
 import { extractMergedFromResponse } from "~/utils/extractMergedFromResponse";
 import { mergeMergedByType } from "~/utils/mergeMergedByType";
