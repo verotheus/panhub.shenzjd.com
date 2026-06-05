@@ -41,7 +41,7 @@ export default defineNuxtConfig({
     // 根据环境变量动态选择部署预设
     preset: process.env.VERCEL
       ? "vercel"
-      : process.env.NITRO_PRESET || "cloudflare-module",
+      : process.env.NITRO_PRESET || "node-server",
     // Vercel serverless function 最大执行时间（Pro: 60s, Hobby: 10s）
     vercel: {
       functions: {
