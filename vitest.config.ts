@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import path from "node:path";
 
 export default defineConfig({
   test: {
@@ -21,7 +22,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "#internal": "/Users/mac/github/panhub.shenzjd.com/.nuxt",
+      "#internal": path.resolve(__dirname, ".nuxt"),
     },
   },
 });
