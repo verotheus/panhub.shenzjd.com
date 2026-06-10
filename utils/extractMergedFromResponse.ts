@@ -3,7 +3,7 @@ import type {
   MergedLinks,
   SearchResponse,
   SearchResult,
-} from "~/server/core/types/models";
+} from "~/types/search";
 
 /** 从 API 响应中提取 MergedLinks，兼容 merged_by_type、results 及扁平数组等多种格式 */
 export function extractMergedFromResponse(

@@ -24,13 +24,18 @@ export interface UseSettingsReturn {
   onClearAllTg: () => void;
 }
 
-// 模块级单例：确保 app.vue、index.vue、SettingsDrawer 等共用同一份 settings
-let settingsSingleton: ReturnType<typeof ref<UserSettings>> | null = null;
+function getDefaultSettings(defaultTgChannels: string[]): UserSettings {
+  return {
+    enabledTgChannels: [...defaultTgChannels],
+    enabledPlugins: [...DEFAULT_USER_SETTINGS.enabledPlugins],
+    concurrency: DEFAULT_USER_SETTINGS.concurrency,
+    pluginTimeoutMs: DEFAULT_USER_SETTINGS.pluginTimeoutMs,
+  };
+}
 
 export function useSettings(): UseSettingsReturn {
   const config = useRuntimeConfig();
 
-  // 获取默认频道（优先使用配置文件，fallback 到运行时配置）
   const defaultTgChannels = computed(() => {
     const configChannels = (config.public as any)?.tgDefaultChannels;
     if (Array.isArray(configChannels) && configChannels.length > 0) {
@@ -39,22 +44,11 @@ export function useSettings(): UseSettingsReturn {
     return channelsConfig.defaultChannels;
   });
 
-  // 单例 settings：全应用共享，设置修改后搜索能立即用到最新配置
-  if (!settingsSingleton) {
-    settingsSingleton = ref<UserSettings>({
-    enabledTgChannels: [
-      ...(defaultTgChannels.value?.length
-        ? defaultTgChannels.value
-        : channelsConfig.defaultChannels),
-    ],
-    enabledPlugins: [...DEFAULT_USER_SETTINGS.enabledPlugins],
-    concurrency: DEFAULT_USER_SETTINGS.concurrency,
-    pluginTimeoutMs: DEFAULT_USER_SETTINGS.pluginTimeoutMs,
-  });
-  }
-  const settings = settingsSingleton;
+  // 使用 Nuxt useState 替代模块级单例，SSR 安全
+  const settings = useState<UserSettings>("user-settings", () =>
+    getDefaultSettings(defaultTgChannels.value)
+  );
 
-  // 加载设置
   function loadSettings(): void {
     if (typeof window === "undefined") return;
 
@@ -77,18 +71,15 @@ export function useSettings(): UseSettingsReturn {
             ? Math.min(16, Math.max(1, parsed.concurrency))
             : DEFAULT_USER_SETTINGS.concurrency,
         pluginTimeoutMs:
-          typeof parsed.pluginTimeoutMs === "number" &&
-          parsed.pluginTimeoutMs > 0
+          typeof parsed.pluginTimeoutMs === "number" && parsed.pluginTimeoutMs > 0
             ? parsed.pluginTimeoutMs
             : DEFAULT_USER_SETTINGS.pluginTimeoutMs,
       };
 
-      // 过滤无效插件
       validated.enabledPlugins = validated.enabledPlugins.filter((name) =>
         ALL_PLUGIN_NAMES.includes(name as any)
       );
 
-      // 仅当插件和 TG 都为空时补默认插件，否则尊重用户选择（如只选 TG 不选插件）
       if (
         validated.enabledPlugins.length === 0 &&
         validated.enabledTgChannels.length === 0
@@ -98,11 +89,10 @@ export function useSettings(): UseSettingsReturn {
 
       settings.value = validated;
     } catch (_error) {
-      // Silent failure - settings will use defaults
+      // Silent failure
     }
   }
 
-  // 保存设置
   function saveSettings(): void {
     if (typeof window === "undefined") return;
 
@@ -113,7 +103,6 @@ export function useSettings(): UseSettingsReturn {
     }
   }
 
-  // 重置为默认
   function resetToDefault(): void {
     if (typeof window === "undefined") return;
 
@@ -123,34 +112,25 @@ export function useSettings(): UseSettingsReturn {
       // Silent failure
     }
 
-    settings.value = {
-      enabledTgChannels: [
-        ...(defaultTgChannels.value?.length ? defaultTgChannels.value : channelsConfig.defaultChannels),
-      ],
-      enabledPlugins: [...DEFAULT_USER_SETTINGS.enabledPlugins],
-      concurrency: DEFAULT_USER_SETTINGS.concurrency,
-      pluginTimeoutMs: DEFAULT_USER_SETTINGS.pluginTimeoutMs,
-    };
+    settings.value = getDefaultSettings(
+      defaultTgChannels.value?.length ? defaultTgChannels.value : channelsConfig.defaultChannels
+    );
 
-    // 刷新页面以完全重置
     if (typeof window !== "undefined") {
       window.location.reload();
     }
   }
 
-  // 全选插件
   function onSelectAll(): void {
     settings.value.enabledPlugins = [...ALL_PLUGIN_NAMES];
     saveSettings();
   }
 
-  // 全不选插件
   function onClearAll(): void {
     settings.value.enabledPlugins = [];
     saveSettings();
   }
 
-  // 全选 TG 频道
   function onSelectAllTg(): void {
     settings.value.enabledTgChannels = [
       ...(defaultTgChannels.value?.length ? defaultTgChannels.value : channelsConfig.defaultChannels),
@@ -158,13 +138,11 @@ export function useSettings(): UseSettingsReturn {
     saveSettings();
   }
 
-  // 全不选 TG 频道
   function onClearAllTg(): void {
     settings.value.enabledTgChannels = [];
     saveSettings();
   }
 
-  // 页面加载时自动加载设置
   if (typeof window !== "undefined") {
     loadSettings();
   }

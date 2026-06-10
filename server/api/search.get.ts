@@ -1,6 +1,8 @@
 import { defineEventHandler, getQuery, sendError, createError } from "h3";
 import { requireSearchAuth } from "../utils/requireAuth";
 import { getOrCreateSearchService } from "../core/services";
+import { loggers } from "../core/utils/logger";
+import { logSearchOnce } from "../utils/searchLog";
 import type { GenericResponse, SearchRequest } from "../core/types/models";
 
 function parseList(val: string | undefined): string[] | undefined {
@@ -72,6 +74,16 @@ export default defineEventHandler(async (event) => {
     req.cloud_types,
     req.ext || {}
   );
+
+  logSearchOnce(kw, {
+    src: req.src,
+    channels: req.channels?.length || 0,
+    plugins: req.plugins?.length || 0,
+    results: result?.merged_by_type
+      ? Object.values(result.merged_by_type).reduce((sum: number, v: any) => sum + (v.links?.length || 0), 0)
+      : 0,
+    warnings: warnings.length,
+  });
 
   const resp: GenericResponse<typeof result> = {
     code: 0,

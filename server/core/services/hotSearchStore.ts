@@ -44,6 +44,8 @@ export interface HotSearchItem {
   score: number;
   lastSearched: number;
   createdAt: number;
+  rank?: number;
+  displayScore?: number;
 }
 
 export interface HotSearchStats {

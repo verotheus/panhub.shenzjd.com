@@ -99,6 +99,7 @@ async function scrapeDoubanMovie(): Promise<DoubanHotItem[]> {
 async function scrapeDoubanTop250(): Promise<DoubanHotItem[]> {
   const allItems: DoubanHotItem[] = [];
   const totalPages = 10; // Top250 共10页，每页25个
+  const PAGE_DELAY = 1500; // 页间延迟(ms)，避免被豆瓣限流
 
   for (let page = 0; page < totalPages; page++) {
     const start = page * 25;
@@ -147,13 +148,17 @@ async function scrapeDoubanTop250(): Promise<DoubanHotItem[]> {
         });
       });
 
-      // 短暂延迟避免请求过快
+      // 页间延迟避免被限流
       if (page < totalPages - 1) {
-        await new Promise(resolve => setTimeout(resolve, 200));
+        await new Promise(resolve => setTimeout(resolve, PAGE_DELAY));
       }
     } catch (e) {
       console.warn(`[DoubanTop250] 第 ${page + 1} 页抓取失败:`, (e as Error).message);
-      // 继续抓取下一页
+      // 连续失败2页则放弃后续抓取，避免无意义请求
+      if (page >= 1 && allItems.length === 0) {
+        console.warn(`[DoubanTop250] 前 ${page + 1} 页均无数据，终止抓取`);
+        break;
+      }
     }
   }
 
@@ -654,38 +659,37 @@ const scrapers: Record<string, () => Promise<DoubanHotItem[]>> = {
   "douban-us-box": scrapeDoubanUsBox,
 };
 
-// 按分类分页获取数据
+// 按分类分页获取数据（全量数据缓存，分页仅做切片）
+const allItemsCache = new MemoryCache<DoubanHotItem[]>({ maxSize: 20 });
+
+async function fetchAllItems(category: string): Promise<DoubanHotItem[]> {
+  const cacheKey = `douban-hot:${category}:all`;
+  const cached = allItemsCache.get(cacheKey);
+  if (cached.hit && cached.value) {
+    return cached.value;
+  }
+
+  const scrape = scrapers[category];
+  if (!scrape) return [];
+
+  const allItems = await scrape();
+  allItemsCache.set(cacheKey, allItems, CACHE_TTL_MS);
+  return allItems;
+}
+
 export async function fetchDoubanHotByCategory(
   category: string,
   page: number = 1,
   limit: number = 25
 ): Promise<DoubanHotPageResult> {
-  const scrape = scrapers[category];
-  if (!scrape) {
-    return { items: [], hasMore: false };
-  }
+  const allItems = await fetchAllItems(category);
 
-  const cacheKey = `douban-hot:${category}:page:${page}`;
+  const start = (page - 1) * limit;
+  const end = start + limit;
+  const items = allItems.slice(start, end);
+  const hasMore = end < allItems.length;
 
-  const cached = cache.get(cacheKey);
-  if (cached.hit && cached.value) {
-    return cached.value;
-  }
-
-  try {
-    const allItems = await scrape();
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const items = allItems.slice(start, end);
-    const hasMore = end < allItems.length;
-
-    const result: DoubanHotPageResult = { items, hasMore };
-    cache.set(cacheKey, result, CACHE_TTL_MS);
-    return result;
-  } catch (e) {
-    console.warn(`[DoubanHot] ${category} 分页抓取失败:`, (e as Error).message);
-    return { items: [], hasMore: false };
-  }
+  return { items, hasMore };
 }
 
 export async function fetchDoubanHot(

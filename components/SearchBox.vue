@@ -25,9 +25,7 @@
           "
           @focus="isFocused = true"
           @blur="isFocused = false"
-          @keyup.enter="handleSearch"
-          @touchstart="handleTouchStart"
-          @touchend="handleTouchEnd" />
+          @keyup.enter="handleSearch" />
 
         <div class="search-actions">
           <!-- 重置按钮 - 搜索后显示 -->
@@ -39,8 +37,7 @@
               $emit('update:modelValue', '');
               $emit('reset');
             "
-            @touchstart="handleTouchStart"
-            @touchend="handleTouchEnd"
+
             aria-label="重置搜索"
             title="重置搜索">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -59,8 +56,7 @@
               $emit('update:modelValue', '');
               $emit('reset');
             "
-            @touchstart="handleTouchStart"
-            @touchend="handleTouchEnd"
+
             aria-label="清空关键词"
             title="清空">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -75,8 +71,7 @@
             class="action-btn pause"
             type="button"
             @click="$emit('pause')"
-            @touchstart="handleTouchStart"
-            @touchend="handleTouchEnd"
+
             aria-label="暂停搜索"
             title="暂停搜索">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -92,8 +87,7 @@
             class="action-btn resume"
             type="button"
             @click="$emit('continue')"
-            @touchstart="handleTouchStart"
-            @touchend="handleTouchEnd"
+
             aria-label="继续搜索"
             title="继续搜索">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -112,9 +106,7 @@
             type="button"
             :disabled="!modelValue"
             aria-label="开始搜索"
-            @click="handleSearch"
-            @touchstart="handleTouchStart"
-            @touchend="handleTouchEnd">
+            @click="handleSearch">
             <span class="btn-text">搜索</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M5 12h14M12 5l7 7-7 7"></path>
@@ -129,6 +121,7 @@
             </svg>
           </div>
         </div>
+
       </div>
     </div>
   </section>
@@ -146,7 +139,6 @@ const emit = defineEmits(["update:modelValue", "search", "reset", "pause", "cont
 
 const isFocused = ref(false);
 const inputEl = ref<HTMLInputElement | null>(null);
-const touchStartTime = ref(0);
 
 // 处理搜索按钮点击
 function handleSearch() {
@@ -164,21 +156,16 @@ function handleSearch() {
   }, 50);
 }
 
-// 处理触摸开始事件
-function handleTouchStart() {
-  touchStartTime.value = Date.now();
-}
-
-// 处理触摸结束事件
-function handleTouchEnd() {
-  const touchDuration = Date.now() - touchStartTime.value;
-  // 如果触摸时间太短，可能是误触，不执行操作
-  if (touchDuration < 50) {
-    return;
+function onKeyDownGlobal(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+    e.preventDefault();
+    inputEl.value?.focus();
+    inputEl.value?.select();
   }
 }
 
 onMounted(() => {
+  document.addEventListener("keydown", onKeyDownGlobal);
   // 仅在桌面端自动聚焦，避免移动端抢焦点和键盘闪烁
   if (window.matchMedia("(pointer: fine)").matches) {
     requestAnimationFrame(() => {
@@ -187,6 +174,10 @@ onMounted(() => {
       }, 100);
     });
   }
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", onKeyDownGlobal);
 });
 </script>
 
@@ -214,29 +205,12 @@ onMounted(() => {
   transition: border-color var(--transition-normal), box-shadow var(--transition-normal),
     transform var(--transition-normal);
   position: relative;
-  overflow: hidden;
-}
-
-.search-box::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, var(--primary), var(--secondary));
-  opacity: 0;
-  transition: opacity var(--transition-normal);
 }
 
 .search-box.focused {
   border-color: var(--primary);
   box-shadow: 0 10px 26px rgba(15, 118, 110, 0.14);
   transform: translateY(-2px);
-}
-
-.search-box.focused::before {
-  opacity: 1;
 }
 
 .search-box.loading {
@@ -290,6 +264,7 @@ onMounted(() => {
   color: var(--text-tertiary);
   font-weight: 400;
 }
+
 
 /* 操作按钮区域 */
 .search-actions {

@@ -15,6 +15,25 @@
           <span class="brand-text">PanHub</span>
         </NuxtLink>
         <div class="nav-actions">
+          <!-- 暗色模式切换 -->
+          <ClientOnly>
+            <button class="btn-icon" type="button" @click="toggleDark" :aria-label="isDark ? '切换到亮色模式' : '切换到暗色模式'" :title="isDark ? '亮色模式' : '暗色模式'">
+              <svg v-if="!isDark" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+              <svg v-else width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+            </button>
+          </ClientOnly>
           <!-- GitHub 链接 -->
           <a
             href="https://github.com/wu529778790/panhub.shenzjd.com"
@@ -73,14 +92,19 @@
 <script setup lang="ts">
 import { ALL_PLUGIN_NAMES } from "./config/plugins";
 import channelsConfig from "~/config/channels.json";
-import darkModeCss from "~/assets/css/dark-mode.css?raw";
-
-// 将暗色模式 CSS 注入到 <head>，绕过 Vite scoped CSS 处理
+// 暗色模式：阻塞脚本设置 class + CSS 文件引入
 useHead({
-  style: [{ innerHTML: darkModeCss }],
+  link: [{ rel: "stylesheet", href: "/css/dark-mode.css" }],
+  script: [
+    {
+      innerHTML: `(function(){var s=localStorage.getItem('panhub:dark-mode');var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);if(d)document.documentElement.classList.add('dark')})();`,
+    },
+  ],
 });
 
 const { settings, loadSettings, saveSettings, resetToDefault } = useSettings();
+const { toast, showToast } = useToast();
+const { isDark, toggle: toggleDark, init: initDarkMode } = useDarkMode();
 const auth = useAuth();
 const openSettings = ref(false);
 const showPasswordGate = ref(false);
@@ -108,21 +132,6 @@ async function onUnlock(password: string) {
 
 provide("requestUnlock", requestUnlock);
 
-// Toast 状态
-const toast = ref({
-  show: false,
-  message: "",
-  type: "info" as "info" | "success" | "error",
-});
-
-// 显示 Toast
-function showToast(message: string, type: "info" | "success" | "error" = "info") {
-  toast.value = { show: true, message, type };
-  setTimeout(() => {
-    toast.value.show = false;
-  }, 3000);
-}
-
 // 所有可用的 TG 频道（用于设置面板）
 const allTgChannels = computed(() => {
   const configChannels = (useRuntimeConfig().public as any)?.tgDefaultChannels;
@@ -139,172 +148,14 @@ watch(() => settings.value, (newVal, oldVal) => {
 }, { deep: true });
 
 onMounted(() => {
+  initDarkMode();
   loadSettings();
   auth.fetchStatus();
 });
-
-// 暴露给子组件使用
-provide('showToast', showToast);
 </script>
 
 <style>
-/* 全局样式重置和现代化设计系统 */
-@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;700;800&family=Noto+Sans+SC:wght@400;500;700;900&family=Syne:wght@600;700;800&display=swap");
-
-@layer base {
-:root {
-  --primary: #0f766e;
-  --primary-dark: #115e59;
-  --secondary: #f59e0b;
-  --success: #10b981;
-  --warning: #d97706;
-  --error: #ef4444;
-
-  --bg-primary: #fffdf8;
-  --bg-secondary: #f7f3ea;
-  --bg-glass: rgba(255, 253, 248, 0.86);
-  --bg-body: radial-gradient(circle at 12% -10%, #fff3d9 0%, transparent 42%),
-    radial-gradient(circle at 90% 8%, #d9f7f3 0%, transparent 35%),
-    #fffdf8;
-  --bg-glass-strong: rgba(255, 253, 248, 0.96);
-  --bg-surface: rgba(255, 255, 255, 0.72);
-  --bg-surface-elevated: rgba(255, 255, 255, 0.6);
-  --bg-surface-subtle: rgba(255, 255, 255, 0.3);
-  --bg-input: rgba(255, 255, 255, 0.5);
-  --bg-hover: rgba(15, 118, 110, 0.04);
-  --bg-active: rgba(15, 118, 110, 0.08);
-  --bg-skeleton: #f0f0f0;
-  --bg-skeleton-shine: rgba(255, 255, 255, 0.6);
-
-  --text-primary: #1f2937;
-  --text-secondary: #4b5563;
-  --text-tertiary: #9ca3af;
-  --text-on-primary: #ffffff;
-  --text-on-warning: #ffffff;
-  --text-on-success: #ffffff;
-  --text-on-danger: #ffffff;
-
-  --border-light: #e5dfd0;
-  --border-medium: #d4c7ab;
-  --border-glass: rgba(255, 255, 255, 0.3);
-  --bg-btn: rgba(255, 255, 255, 0.5);
-  --bg-btn-hover: rgba(255, 255, 255, 0.8);
-
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-
-  --primary-glow: rgba(15, 118, 110, 0.3);
-  --warning-glow: rgba(245, 158, 11, 0.3);
-  --success-glow: rgba(16, 185, 129, 0.3);
-  --danger-glow: rgba(239, 68, 68, 0.3);
-  --accent-glow: rgba(245, 158, 11, 0.3);
-
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 350ms ease;
-}
-}
-
-/* 基础重置 */
-* {
-  box-sizing: border-box;
-}
-
-html,
-body {
-  margin: 0;
-  padding: 0;
-  font-family: "Manrope", "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  background: var(--bg-body);
-  color: var(--text-primary);
-
-  /* iOS Safari兼容性 */
-  -webkit-text-size-adjust: 100%;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* 滚动条美化 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--border-medium);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
-}
-
-/* 输入框基础样式 */
-input[type="text"],
-input[type="search"],
-input[type="email"],
-input[type="password"],
-input[type="number"],
-textarea,
-select {
-  -webkit-appearance: none;
-  -webkit-border-radius: 0;
-  border-radius: 0;
-  -webkit-text-size-adjust: 100%;
-  font-family: inherit;
-}
-
-/* 按钮基础样式 */
-button {
-  -webkit-appearance: none;
-  -webkit-tap-highlight-color: transparent;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-/* iOS Safari触摸区域优化 */
-@media (max-width: 640px) {
-  button,
-  input,
-  select,
-  textarea {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-
-/* 动画定义 */
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
-}
-
-@keyframes blobFloat {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
+@import '~/assets/css/global.css';
 </style>
 
 <style scoped>

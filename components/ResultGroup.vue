@@ -60,12 +60,19 @@
               </span>
             </div>
 
-            <button class="copy-btn" @click.prevent="$emit('copy', r.url)" title="复制链接">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <button
+              class="copy-btn"
+              :class="{ 'copy-btn--copied': copiedUrl === r.url }"
+              @click.prevent="handleCopy(r.url)"
+              :title="copiedUrl === r.url ? '已复制' : '复制链接'">
+              <svg v-if="copiedUrl !== r.url" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
                 <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
               </svg>
-              复制
+              <svg v-else width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              {{ copiedUrl === r.url ? '已复制' : '复制' }}
             </button>
           </div>
         </div>
@@ -94,7 +101,17 @@ const props = defineProps<{
   initialVisible: number;
   canToggleCollapse?: boolean;
 }>();
-defineEmits(["toggle", "copy"]);
+const emit = defineEmits(["toggle", "copy"]);
+
+const copiedUrl = ref("");
+let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+function handleCopy(url: string) {
+  emit("copy", url);
+  copiedUrl.value = url;
+  if (copyTimer) clearTimeout(copyTimer);
+  copyTimer = setTimeout(() => { copiedUrl.value = ""; }, 1500);
+}
 
 const visibleItems = computed(() =>
   props.expanded ? props.items : props.items.slice(0, props.initialVisible)
@@ -103,9 +120,15 @@ const visibleItems = computed(() =>
 function formatDate(d?: string) {
   if (!d) return "";
   const dt = new Date(d);
-  return isNaN(dt.getTime())
-    ? ""
-    : dt.toLocaleDateString() + " " + dt.toLocaleTimeString();
+  if (isNaN(dt.getTime())) return "";
+  const now = Date.now();
+  const diff = now - dt.getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days === 0) return "今天";
+  if (days === 1) return "昨天";
+  if (days < 7) return `${days}天前`;
+  if (days < 365) return `${Math.floor(days / 30)}个月前`;
+  return dt.toLocaleDateString("zh-CN");
 }
 </script>
 
@@ -392,6 +415,11 @@ function formatDate(d?: string) {
 
 .copy-btn svg {
   stroke: currentColor;
+}
+
+.copy-btn--copied {
+  color: var(--success);
+  border-color: var(--success);
 }
 
 /* 卡片底部 */

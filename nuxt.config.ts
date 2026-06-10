@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
   devtools: { enabled: false },
   devServer: {
-    port: 3001,
+    port: 4000,
   },
   app: {
     head: {
@@ -39,7 +39,7 @@ export default defineNuxtConfig({
     // 根据环境变量动态选择部署预设
     preset: process.env.VERCEL
       ? "vercel"
-      : process.env.NITRO_PRESET || "cloudflare-module",
+      : process.env.NITRO_PRESET || "node-server",
     // Vercel serverless function 最大执行时间（Pro: 60s, Hobby: 10s）
     vercel: {
       functions: {

@@ -139,6 +139,8 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount } from "vue";
+
 interface UserSettings {
   enabledTgChannels: string[];
   enabledPlugins: string[];
@@ -247,6 +249,21 @@ function setActiveSectionByScroll() {
 function onDrawerScroll() {
   setActiveSectionByScroll();
 }
+
+function onKeyDown(e: KeyboardEvent) {
+  if (e.key === "Escape" && props.open) {
+    emitSave();
+    emit("update:open", false);
+  }
+}
+
+onMounted(() => {
+  document.addEventListener("keydown", onKeyDown);
+});
+
+onBeforeUnmount(() => {
+  document.removeEventListener("keydown", onKeyDown);
+});
 </script>
 
 <style scoped>

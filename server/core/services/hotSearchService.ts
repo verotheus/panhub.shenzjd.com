@@ -1,9 +1,6 @@
 import type { IHotSearchStore, HotSearchItem, HotSearchStats } from "./hotSearchStore";
-import { JsonFileHotSearchStore } from "./jsonFileHotSearchStore";
 import { MemoryHotSearchStore } from "./memoryHotSearchStore";
 
-// 模块级共享内存存储：确保同一进程内所有降级到内存的情况使用同一实例
-// 解决 service 重建时数据丢失问题（本地开发）
 let sharedMemoryStore: MemoryHotSearchStore | null = null;
 
 function getOrCreateSharedMemoryStore(): MemoryHotSearchStore {
@@ -13,35 +10,37 @@ function getOrCreateSharedMemoryStore(): MemoryHotSearchStore {
   return sharedMemoryStore;
 }
 
-/**
- * 热搜服务
- * 根据环境自动选择 JSON 文件或内存存储
- */
+async function tryCreateSqliteStore(): Promise<IHotSearchStore | null> {
+  try {
+    const { SqliteHotSearchStore } = await import("./sqliteHotSearchStore");
+    const store = new SqliteHotSearchStore();
+    await (store as any)["waitForInit"]?.();
+    return store;
+  } catch {
+    return null;
+  }
+}
+
 export class HotSearchService {
   private store: IHotSearchStore;
-  private storeType: "json" | "memory";
+  private storeType: "sqlite" | "memory";
   private initPromise: Promise<void> | null = null;
 
   constructor() {
-    // 尝试初始化 JSON 文件存储
-    const jsonStore = new JsonFileHotSearchStore();
-    this.store = jsonStore;
-    this.storeType = "json";
-
-    // 异步初始化，如果失败则降级到内存存储
+    const memoryStore = getOrCreateSharedMemoryStore();
+    this.store = memoryStore;
+    this.storeType = "memory";
     this.initPromise = this.initializeWithFallback();
   }
 
   private async initializeWithFallback(): Promise<void> {
-    try {
-      // 等待 JSON 文件存储初始化
-      await (this.store as JsonFileHotSearchStore)["waitForInit"]?.();
-      console.log("[HotSearchService] ✅ 使用 JSON 文件存储模式");
-    } catch {
-      console.log("[HotSearchService] ⚠️ JSON 文件初始化失败，降级到内存模式");
-      // 降级到共享内存存储（同一进程内复用，避免 service 重建导致数据丢失）
-      this.store = getOrCreateSharedMemoryStore();
-      this.storeType = "memory";
+    const sqliteStore = await tryCreateSqliteStore();
+    if (sqliteStore) {
+      this.store = sqliteStore;
+      this.storeType = "sqlite";
+      console.log("[HotSearchService] ✅ 使用 SQLite 存储模式");
+    } else {
+      console.log("[HotSearchService] ⚠️ SQLite 不可用，使用内存存储模式");
     }
   }
 
@@ -83,13 +82,15 @@ export class HotSearchService {
   }
 
   getDatabaseSize(): number {
-    if (this.storeType === "json" && this.store instanceof JsonFileHotSearchStore) {
-      return this.store.getFileSize();
+    if (this.storeType === "sqlite") {
+      try {
+        return (this.store as any).getDbSize?.() ?? 0;
+      } catch { return 0; }
     }
     return 0;
   }
 
-  getStoreType(): "json" | "memory" {
+  getStoreType(): "sqlite" | "memory" {
     return this.storeType;
   }
 
@@ -98,8 +99,7 @@ export class HotSearchService {
   }
 }
 
-// 单例模式
-const HOT_SEARCH_SERVICE_KEY = "__panhub_hot_search_service_v2__";
+const HOT_SEARCH_SERVICE_KEY = "__panhub_hot_search_service_v3__";
 
 export function getOrCreateHotSearchService(): HotSearchService {
   const context = (globalThis as any)[HOT_SEARCH_SERVICE_KEY];
@@ -118,8 +118,6 @@ export function resetHotSearchService(): void {
     context.service.close();
   }
   delete (globalThis as any)[HOT_SEARCH_SERVICE_KEY];
-  // 不重置 sharedMemoryStore，保持内存数据（用于测试时需单独清理）
 }
 
-// 向后兼容：导出旧的类型别名
 export type { HotSearchItem, HotSearchStats };
